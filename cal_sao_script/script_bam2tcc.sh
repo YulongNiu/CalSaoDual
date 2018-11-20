@@ -1,0 +1,1 @@
+/home/Yulong/Biotools/bam2tcc/build/src/bam2tcc -g /home/Yulong/Biotools/RefData/cal/C_albicans_SC5314_A22_current_features.gff -S /extDisk2/cal_sao/filter_alignments/CA_1_filter_ca_sort.bam --check-gff

@@ -1,0 +1,28 @@
+# The ignore files when I am writing an R package.
+*~
+.Rhistory
+.Rbuildignore
+.Rproj.user/
+.directory
+
+
+# object and shared objects
+*.o
+*.so
+*.dll
+
+# bam and sam files
+*.bam
+
+# html reports
+*.html
+
+# office file
+*.xlsx
+
+
+# folders
+rawdata/
+filter_alignments/
+figures_tables/
+Ref/
