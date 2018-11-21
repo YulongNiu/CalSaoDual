@@ -3,6 +3,7 @@ library('stringr')
 library('utils')
 library('foreach')
 library('doMC')
+library('magrittr')
 
 registerDoMC(8)
 
@@ -66,11 +67,25 @@ noteAnno <- foreach(i = 1:length(noteAnno), .combine = c) %dopar% {
 }
 
 gffAnno <- cbind(gffAnno[, -9], ids, geneNames, noteAnno)
+
+## extract useful info
 rawAnno <- gffAnno[gffAnno[, 3] == 'gene', ]
+rawAnno %<>% `[`(., , c(9, 10, 1, 4, 5, 7, 11))
+rawAnno$Length <- abs(rawAnno[, 4] - rawAnno[, 5])
+colnames(rawAnno) <- c('GeneID', 'Names', 'Chromosome', 'Start', 'End', 'Strand', 'Product', 'Length')
 write.csv(rawAnno, '/extDisk2/cal_sao/figures_tables/CGD_rawgff_Anno.csv')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~NCBI sao gff~~~~~~~~~~~~~~~~~~~~~~~~~
+gffPath <- '/home/Yulong/Biotools/RefData/sao/Sa.gff'
+gffAnno <- read.delim(gffPath, comment.char = '#', header = FALSE)
+
+## CDS
+## ID=cds0;Parent=gene0;Dbxref=Genbank:YP_498609.1,GeneID:3919798;Name=YP_498609.1;Note=binds to the dnaA-box as an ATP-bound complex at the origin of replication during the initiation of chromosomal replication%3B can also affect transcription of multiple genes including itself.;gbkey=CDS;gene=dnaA;product=chromosomal replication initiation protein;protein_id=YP_498609.1;transl_table=11
+
+## gene
+## ID=gene0;Dbxref=GeneID:3919798;Name=dnaA;gbkey=Gene;gene=dnaA;gene_biotype=protein_coding;locus_tag=SAOUHSC_00001
+
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #################################################################
