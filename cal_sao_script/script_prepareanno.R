@@ -71,21 +71,38 @@ gffAnno <- cbind(gffAnno[, -9], ids, geneNames, noteAnno)
 ## extract useful info
 rawAnno <- gffAnno[gffAnno[, 3] == 'gene', ]
 rawAnno %<>% `[`(., , c(9, 10, 1, 4, 5, 7, 11))
-rawAnno$Length <- abs(rawAnno[, 4] - rawAnno[, 5])
+rawAnno$Length <- abs(rawAnno[, 4] - rawAnno[, 5]) + 1
 colnames(rawAnno) <- c('GeneID', 'Names', 'Chromosome', 'Start', 'End', 'Strand', 'Product', 'Length')
 write.csv(rawAnno, '/extDisk2/cal_sao/figures_tables/CGD_rawgff_Anno.csv')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~NCBI sao gff~~~~~~~~~~~~~~~~~~~~~~~~~
 gffPath <- '/home/Yulong/Biotools/RefData/sao/Sa.gff'
-gffAnno <- read.delim(gffPath, comment.char = '#', header = FALSE)
+gffAnno <- read.delim(gffPath, comment.char = '#', header = FALSE, stringsAsFactor = FALSE)
 
 ## CDS
 ## ID=cds0;Parent=gene0;Dbxref=Genbank:YP_498609.1,GeneID:3919798;Name=YP_498609.1;Note=binds to the dnaA-box as an ATP-bound complex at the origin of replication during the initiation of chromosomal replication%3B can also affect transcription of multiple genes including itself.;gbkey=CDS;gene=dnaA;product=chromosomal replication initiation protein;protein_id=YP_498609.1;transl_table=11
+cdsAnno <- gffAnno[gffAnno[, 3] == 'CDS', 9]
+cdsAnnoMat <- cbind(str_extract(cdsAnno, 'Parent=\\w+;?') %>% substr(., 8, nchar(.) - 1),
+                    str_extract(cdsAnno, 'Note=(.*?);') %>% substr(., 6, nchar(.) - 1) %>% sapply(., URLdecode),
+                    str_extract(cdsAnno, 'product=(.*?);') %>% substr(., 9, nchar(.) - 1) %>% sapply(., URLdecode))
+rownames(cdsAnnoMat) <- NULL
+colnames(cdsAnnoMat) <- c('ID', 'Note', 'Product')
 
 ## gene
 ## ID=gene0;Dbxref=GeneID:3919798;Name=dnaA;gbkey=Gene;gene=dnaA;gene_biotype=protein_coding;locus_tag=SAOUHSC_00001
+geneMat <- gffAnno[gffAnno[, 3] == 'gene', ]
+geneAnno <- geneMat[, 9]
+geneAnnoMat <- cbind(str_extract(geneAnno, 'ID=(\\w+?);') %>% substr(., 4, nchar(.) - 1),
+                    str_extract(geneAnno, 'Name=(.*?);') %>% substr(., 6, nchar(.) - 1) %>% sapply(., URLdecode),
+                    str_extract(geneAnno, 'locus_tag=.*') %>% substr(., 11, nchar(.)) %>% sapply(., URLdecode))
+geneMat <- cbind(geneAnnoMat, geneMat[, c(4, 5, 7)])
+rownames(geneMat) <- NULL
 
-
+rawAnno <- merge(geneMat, cdsAnnoMat, by.x = '1', by.y = 'ID', sort = FALSE)
+rawAnno %<>% `[`(, c(1, 3, 2, 4:8))
+colnames(rawAnno)[1:6] <- c('ID', 'GeneID', 'Name', 'Start', 'End', 'Strand')
+rawAnno$Length <- abs(rawAnno$Start - rawAnno$End) + 1
+write.csv(rawAnno, '/extDisk2/cal_sao/figures_tables/sao_rawgff_Anno.csv')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #################################################################
