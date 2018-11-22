@@ -82,7 +82,7 @@ gffAnno <- read.delim(gffPath, comment.char = '#', header = FALSE, stringsAsFact
 
 ## CDS
 ## ID=cds0;Parent=gene0;Dbxref=Genbank:YP_498609.1,GeneID:3919798;Name=YP_498609.1;Note=binds to the dnaA-box as an ATP-bound complex at the origin of replication during the initiation of chromosomal replication%3B can also affect transcription of multiple genes including itself.;gbkey=CDS;gene=dnaA;product=chromosomal replication initiation protein;protein_id=YP_498609.1;transl_table=11
-cdsAnno <- gffAnno[gffAnno[, 3] == 'CDS', 9]
+cdsAnno <- gffAnno[gffAnno[, 3] %in% c('CDS', 'tRNA', 'rRNA'), 9]
 cdsAnnoMat <- cbind(str_extract(cdsAnno, 'Parent=\\w+;?') %>% substr(., 8, nchar(.) - 1),
                     str_extract(cdsAnno, 'Note=(.*?);') %>% substr(., 6, nchar(.) - 1) %>% sapply(., URLdecode),
                     str_extract(cdsAnno, 'product=(.*?);') %>% substr(., 9, nchar(.) - 1) %>% sapply(., URLdecode))
