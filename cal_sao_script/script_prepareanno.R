@@ -48,28 +48,25 @@ library('Biostrings')
 library('stringr')
 library('magrittr')
 
-save(smumerge, file = '/extDisk1/RESEARCH/smuSeqSongYing/Rockhopper_Results/smumerge.RData')
+load('/extDisk2/cal_sao/figures_tables/saoanno.RData')
 
-deg <- read.csv('/extDisk1/RESEARCH/smuSeqSongYing/Rockhopper_Results/deg.csv', row.names = 1, stringsAsFactor = FALSE) %>%
-  `[`(., , 1:8)
-
-gff <- read.table('/home/Yulong/Biotools/RefData/smu/NC_004350.gff', skip = 3, header = FALSE, sep = '\t', stringsAsFactors = FALSE) %>%
+gff <- read.table('/home/Yulong/Biotools/RefData/sao/NC_007795.gff', skip = 3, header = FALSE, sep = '\t', stringsAsFactors = FALSE) %>%
   `[`(., , 9) %>%
   strsplit(., split = ';', fixed = TRUE) %>%
   sapply(., `[`, 1) %>%
   strsplit(., split = '=', fixed = TRUE) %>%
   sapply(., `[`, 2)
 
-deg <- deg[order(deg$Names), ][rank(gff), ]
+saoanno <- saoanno[order(saoanno$Name), ][rank(gff), ]
 
-smucdna <- readBStringSet('/home/Yulong/Biotools/RefData/smu/NC_004350_cdna.fa')
-names(smucdna) <- deg$GeneID
+smucdna <- readBStringSet('/home/Yulong/Biotools/RefData/sao/NC_007795_cdna.fa')
+names(smucdna) <- saoanno$GeneID
 
-writeXStringSet(smucdna, '/home/Yulong/Biotools/RefData/smu/NC_004350_cdna_name.fa')
+writeXStringSet(smucdna, '/home/Yulong/Biotools/RefData/sao/NC_007795_cdna_name.fa')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #############################################################
 
-##########################prepare gff annotation#################
+##########################prepare cal gff annotation#################
 library('stringr')
 library('utils')
 library('foreach')
