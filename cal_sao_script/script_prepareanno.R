@@ -42,8 +42,7 @@ save(saoanno, file = '/extDisk2/cal_sao/figures_tables/saoanno.RData')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ##################################################################
 
-
-#################################k index cdna####################
+#################################sao k index cdna####################
 library('Biostrings')
 library('stringr')
 library('magrittr')
@@ -57,7 +56,9 @@ gff <- read.table('/home/Yulong/Biotools/RefData/sao/NC_007795.gff', skip = 3, h
   strsplit(., split = '=', fixed = TRUE) %>%
   sapply(., `[`, 2)
 
-saoanno <- saoanno[order(saoanno$Name), ][rank(gff), ]
+
+## test
+sum(saoanno$Name == gff) == length(gff)
 
 smucdna <- readBStringSet('/home/Yulong/Biotools/RefData/sao/NC_007795_cdna.fa')
 names(smucdna) <- saoanno$GeneID
@@ -65,6 +66,23 @@ names(smucdna) <- saoanno$GeneID
 writeXStringSet(smucdna, '/home/Yulong/Biotools/RefData/sao/NC_007795_cdna_name.fa')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #############################################################
+
+#################################cal k index cdna####################
+library('Biostrings')
+library('magrittr')
+
+calcdna <- readBStringSet('/home/Yulong/Biotools/RefData/cal/C_albicans_SC5314_A22_current_default_coding.fasta.gz')
+
+cdnaname <- names(calcdna) %>% strsplit(., split = ' ', fixed = TRUE) %>% sapply(., '[', 1)
+names(calcdna) <- cdnaname
+
+## pseudogene
+## tmp1name[!(tmp1name %in% rawAnno$id)]
+## [1] "C6_04200C_A" "CR_01860W_A" "C1_13530W_A" "CR_01840W_A" "CR_01850C_A"
+## [6] "CR_02900W_A" "C2_06450C_A" "C5_04450C_A"
+
+writeXStringSet(calcdna, '/extDisk2/cal_sao/kallisto_results/cal_cdna_name.fa')
+#####################################################################
 
 ##########################prepare cal gff annotation#################
 library('stringr')
@@ -174,3 +192,8 @@ rawAnno$Length <- abs(rawAnno$Start - rawAnno$End) + 1
 write.csv(rawAnno, '/extDisk2/cal_sao/figures_tables/sao_rawgff_Anno.csv')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #################################################################
+
+
+
+
+
