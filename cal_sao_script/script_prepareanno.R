@@ -1,3 +1,74 @@
+############################sao annotation##############
+library('Biostrings')
+library('stringr')
+library('magrittr')
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~gff~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+saogff <- read.delim('/home/Yulong/Biotools/RefData/sao/NC_007795.gff', skip = 3, header = FALSE, stringsAsFactor = FALSE)
+
+names <- sapply(saogff[, 9], function(x) {
+  eachNA <- unlist(strsplit(x, split = ';', fixed = TRUE))
+  eachN <- eachNA[1]
+  eachA <- eachNA[2]
+  eachN <- unlist(strsplit(eachN, split = '=', fixed = TRUE))[2]
+  eachA <- unlist(strsplit(eachA, split = '=', fixed = TRUE))[2]
+  return(c(eachN, eachA))
+})
+
+names <- t(names)
+colnames(names) <- c('geneNames', 'Anno')
+rownames(names) <- NULL
+saogff <- cbind(saogff, names)
+saogff$loc <- paste(saogff$V4, saogff$V5, sep = '..')
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+##~~~~~~~~~~~~~~~~~~~~~add ptt/rnt~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+saoptt <- read.delim('/home/Yulong/Biotools/RefData/sao/NC_007795.ptt', skip = 2, stringsAsFactor = FALSE)
+saornt <- read.delim('/home/Yulong/Biotools/RefData/sao/NC_007795.rnt', skip = 2, stringsAsFactor = FALSE)
+saoannot <- rbind(saoptt, saornt)
+
+## deal with slash
+slashLogic <- saoannot[, 'Gene'] == '-'
+saoannot[slashLogic, 'Gene'] <- saoannot[slashLogic, 'Synonym']
+
+saomerge <- merge(saogff, saoannot, by.x = 'loc', by.y = 'Location', sort = FALSE)
+
+saoanno <- saomerge[, c('Synonym', 'Gene', 'V4', 'V5', 'Product'), ]
+colnames(saoanno) <- c('GeneID', 'Name', 'Start', 'End', 'Product')
+saoanno$Length <- abs(saoanno$Start - saoanno$End) + 1
+saoanno$COG <- saomerge$COG
+
+save(saoanno, file = '/extDisk2/cal_sao/figures_tables/saoanno.RData')
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##################################################################
+
+
+#################################k index cdna####################
+library('Biostrings')
+library('stringr')
+library('magrittr')
+
+save(smumerge, file = '/extDisk1/RESEARCH/smuSeqSongYing/Rockhopper_Results/smumerge.RData')
+
+deg <- read.csv('/extDisk1/RESEARCH/smuSeqSongYing/Rockhopper_Results/deg.csv', row.names = 1, stringsAsFactor = FALSE) %>%
+  `[`(., , 1:8)
+
+gff <- read.table('/home/Yulong/Biotools/RefData/smu/NC_004350.gff', skip = 3, header = FALSE, sep = '\t', stringsAsFactors = FALSE) %>%
+  `[`(., , 9) %>%
+  strsplit(., split = ';', fixed = TRUE) %>%
+  sapply(., `[`, 1) %>%
+  strsplit(., split = '=', fixed = TRUE) %>%
+  sapply(., `[`, 2)
+
+deg <- deg[order(deg$Names), ][rank(gff), ]
+
+smucdna <- readBStringSet('/home/Yulong/Biotools/RefData/smu/NC_004350_cdna.fa')
+names(smucdna) <- deg$GeneID
+
+writeXStringSet(smucdna, '/home/Yulong/Biotools/RefData/smu/NC_004350_cdna_name.fa')
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#############################################################
+
 ##########################prepare gff annotation#################
 library('stringr')
 library('utils')
