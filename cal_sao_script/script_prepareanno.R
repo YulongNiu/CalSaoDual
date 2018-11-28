@@ -1,4 +1,4 @@
-############################sao annotation##############
+u############################sao annotation##############
 library('readr')
 library('dplyr')
 library('Biostrings')
@@ -40,22 +40,23 @@ saogff %<>%
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##~~~~~~~~~~~~~~~~~~~~~add ptt/rnt~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-saoptt <- read.delim('/home/Yulong/Biotools/RefData/sao/NC_007795.ptt', skip = 2, stringsAsFactor = FALSE)
-saornt <- read.delim('/home/Yulong/Biotools/RefData/sao/NC_007795.rnt', skip = 2, stringsAsFactor = FALSE)
-saoannot <- rbind(saoptt, saornt)
+saoptt <- read_tsv('/home/Yulong/Biotools/RefData/sao/NC_007795.ptt', skip = 2)
+saornt <- read_tsv('/home/Yulong/Biotools/RefData/sao/NC_007795.rnt', skip = 2)
+saoannot <- bind_rows(saoptt, saornt)
 
 ## deal with slash
-slashLogic <- saoannot[, 'Gene'] == '-'
-saoannot[slashLogic, 'Gene'] <- saoannot[slashLogic, 'Synonym']
+saoannot %<>%
+  mutate(Gene = if_else(Gene == '-', Synonym, Gene))
 
-saomerge <- merge(saogff, saoannot, by.x = 'loc', by.y = 'Location', sort = FALSE)
+saomerge <- inner_join(saogff, saoannot, by = c('loc' = 'Location')) %>%
+  transmute(., Synonym, Gene, Start = start,
+            End = end, Strand = Strand, Product,
+            Length = abs(start - end) + 1, COG)
 
-saoanno <- saomerge[, c('Synonym', 'Gene', 'V4', 'V5', 'Product'), ]
-colnames(saoanno) <- c('GeneID', 'Name', 'Start', 'End', 'Product')
-saoanno$Length <- abs(saoanno$Start - saoanno$End) + 1
-saoanno$COG <- saomerge$COG
+## check order
+sum(saogff$geneNames == saomerge$Gene) == nrow(saomerge)
 
-save(saoanno, file = '/extDisk2/cal_sao/figures_tables/saoanno.RData')
+save(saomerge, file = '/extDisk2/cal_sao/figures_tables/saomerge.RData')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ##################################################################
 
@@ -63,22 +64,12 @@ save(saoanno, file = '/extDisk2/cal_sao/figures_tables/saoanno.RData')
 library('Biostrings')
 library('stringr')
 library('magrittr')
+library('tibble')
 
-load('/extDisk2/cal_sao/figures_tables/saoanno.RData')
-
-gff <- read.table('/home/Yulong/Biotools/RefData/sao/NC_007795.gff', skip = 3, header = FALSE, sep = '\t', stringsAsFactors = FALSE) %>%
-  `[`(., , 9) %>%
-  strsplit(., split = ';', fixed = TRUE) %>%
-  sapply(., `[`, 1) %>%
-  strsplit(., split = '=', fixed = TRUE) %>%
-  sapply(., `[`, 2)
-
-
-## test
-sum(saoanno$Name == gff) == length(gff)
+load('/extDisk2/cal_sao/figures_tables/saomerge.RData')
 
 smucdna <- readBStringSet('/home/Yulong/Biotools/RefData/sao/NC_007795_cdna.fa')
-names(smucdna) <- saoanno$GeneID
+names(smucdna) <- saomerge$Synonym
 
 writeXStringSet(smucdna, '/home/Yulong/Biotools/RefData/sao/NC_007795_cdna_name.fa')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
