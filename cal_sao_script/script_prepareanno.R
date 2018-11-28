@@ -1,25 +1,42 @@
 ############################sao annotation##############
+library('readr')
+library('dplyr')
 library('Biostrings')
 library('stringr')
 library('magrittr')
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~gff~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-saogff <- read.delim('/home/Yulong/Biotools/RefData/sao/NC_007795.gff', skip = 3, header = FALSE, stringsAsFactor = FALSE)
+saogff <- read_tsv('/home/Yulong/Biotools/RefData/sao/NC_007795.gff', skip = 3, col_names = c('seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute'))
 
-names <- sapply(saogff[, 9], function(x) {
-  eachNA <- unlist(strsplit(x, split = ';', fixed = TRUE))
-  eachN <- eachNA[1]
-  eachA <- eachNA[2]
-  eachN <- unlist(strsplit(eachN, split = '=', fixed = TRUE))[2]
-  eachA <- unlist(strsplit(eachA, split = '=', fixed = TRUE))[2]
-  return(c(eachN, eachA))
-})
+names <- saogff %>%
+  select(., 'attribute') %>%
+  unlist %>%
+  sapply(., function(x) {
+    eachNA <- x %>%
+      strsplit(x, split = ';', fixed = TRUE) %>%
+      unlist
 
-names <- t(names)
+    eachN <- eachNA[1] %>%
+      strsplit(., split = '=', fixed = TRUE) %>%
+      unlist %>%
+      `[`(., 2)
+
+    eachA <- eachNA[2] %>%
+      strsplit(., split = '=', fixed = TRUE) %>%
+      unlist %>%
+      `[`(., 2) %>%
+      substring(., first = 2, last = nchar(.) - 1)
+
+    return(c(eachN, eachA))
+  }) %>%
+  t %>%
+as_tibble
+
 colnames(names) <- c('geneNames', 'Anno')
-rownames(names) <- NULL
-saogff <- cbind(saogff, names)
-saogff$loc <- paste(saogff$V4, saogff$V5, sep = '..')
+
+saogff %<>%
+  bind_cols(., names) %>%
+  mutate(., loc = paste(start, end, sep = '..'))
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##~~~~~~~~~~~~~~~~~~~~~add ptt/rnt~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -94,8 +94,6 @@ tmp1 <- SplitSpe(mixec, mixeccount, mixefflen, c(calnum, saonum))
 library('foreach')
 library('tximport')
 library('rhdf5')
-library('DESeq2')
-library('edgeR')
 library('magrittr')
 
 ## cal number: 6226
@@ -104,6 +102,7 @@ calnum <- 6226
 saonum <- 2844
 
 wd <- '/extDisk2/cal_sao/kallisto_results'
+setwd(wd)
 
 callabel <- c('CAF2_1_1', 'CAF2_1_2', 'CAF2_1_3')
 files <- file.path(wd, callabel, 'abundance.h5')
@@ -135,22 +134,25 @@ saok$length %<>% cbind(., mixcountlen[(calnum + 1) : (calnum + saonum), c(1, 3, 
 
 ##~~~~~~~~~~~~~~~~~~~~~~DESeq2 for cal~~~~~~~~~~~~~~~~~~~~~~~
 library('DESeq2')
+library('dplyr')
+library('readr')
 
 targets <- data.frame(Group = factor(c('CAL', 'CAL', 'CAL', 'CAL_SAO', 'CAL_SAO', 'CAL_SAO')), Sample = paste0('cal', 1:6))
 rownames(targets) <- paste0(targets$Group, c(1:3, 1:3))
 colnames(calk$counts) <- rownames(targets)
-glioPR <- DESeqDataSetFromTximport(calk, colData = targets, design = ~Group)
+degres <- DESeqDataSetFromTximport(calk, colData = targets, design = ~Group)
 
 calanno <- read.csv('/extDisk2/cal_sao/figures_tables/CGD_rawgff_Anno.csv', row.names = 1, stringsAsFactors = FALSE)
+calanno <- read_csv('/extDisk2/cal_sao/figures_tables/CGD_rawgff_Anno.csv')
 
-glioPR <- glioPR[rowSums(counts(glioPR)) > 1, ]
-glioPR <- DESeq(glioPR)
+degres <- degres[rowSums(counts(degres)) > 1, ]
+degres <- DESeq(degres)
 ## count transformation
-rld <- rlog(glioPR)
-vst <- varianceStabilizingTransformation(glioPR)
-resRaw <- results(glioPR)
+rld <- rlog(degres)
+vst <- varianceStabilizingTransformation(degres)
+resRaw <- results(degres)
 summary(resRaw)
-res <- cbind(as.matrix(mcols(glioPR)[, 1:10]), assay(rld))
+res <- cbind(as.matrix(mcols(degres)[, 1:10]), assay(rld))
 anno <- calanno[match(rownames(res), calanno[, 1]), ]
 res <- cbind(anno, res[, 11:16], data.frame(resRaw[, c(5, 6, 2)]))
 res <- res[order(res[, 'padj']), ]
