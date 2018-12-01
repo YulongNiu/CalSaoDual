@@ -1,4 +1,4 @@
-u############################sao annotation##############
+############################sao annotation##############
 library('readr')
 library('dplyr')
 library('Biostrings')
@@ -49,12 +49,14 @@ saoannot %<>%
   mutate(Gene = if_else(Gene == '-', Synonym, Gene))
 
 saomerge <- inner_join(saogff, saoannot, by = c('loc' = 'Location')) %>%
-  transmute(., Synonym, Gene, Start = start,
+  transmute(., ID = Synonym, Gene, Start = start,
             End = end, Strand = Strand, Product,
-            Length = abs(start - end) + 1, COG)
+            COG, Length = abs(start - end) + 1)
 
 ## check order
 sum(saogff$geneNames == saomerge$Gene) == nrow(saomerge)
+
+write.csv(saomerge, file = '/extDisk2/cal_sao/figures_tables/saoanno.csv', row.names = FALSE)
 
 save(saomerge, file = '/extDisk2/cal_sao/figures_tables/saomerge.RData')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -97,19 +99,27 @@ library('stringr')
 library('utils')
 library('foreach')
 library('doMC')
+library('readr')
+library('dplyr')
 library('magrittr')
 
 registerDoMC(8)
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~CGD raw gff~~~~~~~~~~~~~~~~~~~~~~~~
 gffPath <- '/home/Yulong/Biotools/RefData/cal/C_albicans_SC5314_A22_current_features.gff'
-gffAnno <- read.delim(gffPath, comment.char = '#', header = FALSE)
+gffAnno <- read_tsv(gffPath, col_names = c('seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attribute'), comment = '#')
 
-noteAnno <- as.character(gffAnno[, 9])
-noteAnno <- str_trim(noteAnno)
+noteAnno <- gffAnno %>%
+  select(attribute) %>%
+  unlist %>%
+  unname %>%
+  str_trim
 
-ids <- sapply(strsplit(noteAnno, split = ';', fixed = TRUE), '[[', 1)
-ids <- sapply(strsplit(ids, split = '=', fixed = TRUE), '[[', 2)
+ids <- noteAnno %>%
+  strsplit(., split = ';', fixed = TRUE) %>%
+  sapply(., '[[', 1) %>%
+  strsplit(., split = '=', fixed = TRUE) %>%
+  sapply(., '[[', 2)
 
 ##"ID=CR_02900W_A;Name=CR_02900W_A;Note=(orf19.2847.1) Pseudogene; formerly an ORF Predicted by Annotation Working Group that was subsequently removed from Assembly 20;Alias=CA2870,CR_02900W,CR_02900W_B,Contig4-2393_0004,IPF17923.2,IPF17924.1,OPT2.53f,orf19.2847.1"
 ExtractNote <- function(x) {
@@ -160,14 +170,15 @@ noteAnno <- foreach(i = 1:length(noteAnno), .combine = c) %dopar% {
   return(x)
 }
 
-gffAnno <- cbind(gffAnno[, -9], ids, geneNames, noteAnno)
+gffAnno %<>%
+  select(-attribute) %>%
+  mutate(ids = ids, geneNames = geneNames, noteAnno = noteAnno)
 
 ## extract useful info
-rawAnno <- gffAnno[gffAnno[, 3] == 'gene', ]
-rawAnno %<>% `[`(., , c(9, 10, 1, 4, 5, 7, 11))
-rawAnno$Length <- abs(rawAnno[, 4] - rawAnno[, 5]) + 1
-colnames(rawAnno) <- c('GeneID', 'Names', 'Chromosome', 'Start', 'End', 'Strand', 'Product', 'Length')
-write.csv(rawAnno, '/extDisk2/cal_sao/figures_tables/CGD_rawgff_Anno.csv')
+rawAnno <- gffAnno %>%
+  filter(feature %in% c('gene', 'pseudogene', 'ncRNA')) %>%
+  transmute(ID = ids, Gene = geneNames, Chromosome = seqname, Start = start, End = end, Strand = strand, Product = noteAnno, Length = abs(start - end) + 1)
+write.csv(rawAnno, '/extDisk2/cal_sao/figures_tables/CGD_rawgff_Anno.csv', row.names = FALSE)
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~NCBI sao gff~~~~~~~~~~~~~~~~~~~~~~~~~
