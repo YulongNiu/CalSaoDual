@@ -136,34 +136,63 @@ saok$length %<>% cbind(., mixcountlen[(calnum + 1) : (calnum + saonum), c(1, 3, 
 library('DESeq2')
 library('dplyr')
 library('readr')
+library('tibble')
+
+calanno <- read_csv('/extDisk2/cal_sao/figures_tables/CGD_rawgff_Anno.csv')
 
 targets <- data.frame(Group = factor(c('CAL', 'CAL', 'CAL', 'CAL_SAO', 'CAL_SAO', 'CAL_SAO')), Sample = paste0('cal', 1:6))
 rownames(targets) <- paste0(targets$Group, c(1:3, 1:3))
 colnames(calk$counts) <- rownames(targets)
 degres <- DESeqDataSetFromTximport(calk, colData = targets, design = ~Group)
 
-calanno <- read.csv('/extDisk2/cal_sao/figures_tables/CGD_rawgff_Anno.csv', row.names = 1, stringsAsFactors = FALSE)
-calanno <- read_csv('/extDisk2/cal_sao/figures_tables/CGD_rawgff_Anno.csv')
-
+## DEGs
 degres <- degres[rowSums(counts(degres)) > 1, ]
 degres <- DESeq(degres)
+
 ## count transformation
 rld <- rlog(degres)
 vst <- varianceStabilizingTransformation(degres)
-resRaw <- results(degres)
-summary(resRaw)
-res <- cbind(as.matrix(mcols(degres)[, 1:10]), assay(rld))
-anno <- calanno[match(rownames(res), calanno[, 1]), ]
-res <- cbind(anno, res[, 11:16], data.frame(resRaw[, c(5, 6, 2)]))
-res <- res[order(res[, 'padj']), ]
+resRaw <- degres %>%
+  results %T>%
+  summary %>%
+  as.tibble
+
+res <- cbind.data.frame(as.matrix(mcols(degres)[, 1:10]), assay(rld), stringsAsFactors = FALSE) %>%
+  rownames_to_column(., var = 'ID') %>%
+  as.tibble %>%
+  bind_cols(.,  select(resRaw, pvalue, padj, log2FoldChange)) %>%
+  inner_join(., calanno, by = 'ID') %>%
+  select(., ID, Gene : Length, CAL1 : log2FoldChange) %>%
+  arrange(., padj)
+
 write.csv(res, file = 'CAL_DEG_whole_k.csv', row.names = FALSE)
 
 ## padj < 0.05 & |log2FC| > 1
-sigLogic <- res$padj < 0.05 & abs(res$log2FoldChange) > log2(2)
-sigLogic[is.na(sigLogic)] <- FALSE
-resSig <- res[sigLogic, ]
+resSig <- res %>%
+  filter(padj < 0.05, abs(log2FoldChange) > log2(2), !is.na(padj))
+
 write.csv(resSig, file = 'CAL_DEG_FC2_k.csv', row.names = FALSE)
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~heat map~~~~~~~~~~~~~~~~~~~~~~~~~~
+library('pheatmap')
+
+## use rld
+heatmapCount <- resSig %>%
+  top_n(nrow(.)) %>%
+  select(., Gene, CAL1 : CAL_SAO3) %>%
+  as.data.frame %>%
+  column_to_rownames(., var = 'Gene')
+
+annoCol <- data.frame(Group = colData(degres)[, 1])
+row.names(annoCol) <- rownames(colData(degres))
+annoColor <- list(Group = c(CAL = '#00C19F', CAL_SAO = '#F8766D'))
+## annoRow = data.frame(GeneClass = factor(rep(c("Path1", "Path2", "Path3"), c(30, 30, 40))))
+## rownames(annoRow) <- rownames(heatmapCount)
+cairo_pdf('CAL_heatmap.pdf')
+pheatmap(heatmapCount, annotation_col = annoCol, annotation_colors = annoColor, fontsize=12, fontsize_row=5.5, annotation_legend = TRUE)
+dev.off()
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PCA~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 library('directlabels')
@@ -186,35 +215,94 @@ ggplot(pcaData, aes(x = PC1, y = PC2, colour = Group)) +
 dev.off()
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-##~~~~~~~~~~~~~~~~~~~~~~DESeq2 for cal~~~~~~~~~~~~~~~~~~~~~~~
-library('DESeq2')
+##~~~~~~~~~~~~~~~~~~~volcano plot~~~~~~~~~~~~~~~~~~~~~~~~~~
+library('ggplot2')
+library('latex2exp')
+
+## separate up and down
+sig <- res %>%
+  transmute(case_when(padj < 0.05 & log2FoldChange > log2(2) & !is.na(padj) ~ 'up',
+                      padj < 0.05 & log2FoldChange < -log2(2) & !is.na(padj) ~ 'down',
+                      TRUE ~ 'no')) %>%
+  unlist %>%
+  unname
+
+voldt <- data.frame(padj = -log10(res$padj),
+                    FC = res$log2FoldChange,
+                    Type = sig)
+## remove padj NA and no Inf
+voldt <- voldt[!(is.na(voldt$padj) | is.infinite(voldt$padj)), ]
+
+cairo_pdf('CAL_DEG_FC2_volplot.pdf')
+ggplot(voldt, aes(x = FC, y = padj, colour = Type)) +
+  geom_point(alpha = 0.75) +
+  scale_color_manual(values=c('forestgreen', 'grey60', 'firebrick'),
+                     labels = c('down-regulate DEGs', 'unchanged genes', 'up-regulated DEGs')) +
+  geom_vline(xintercept = -log2(2), linetype = 'dashed', color = 'grey70') +
+  geom_vline(xintercept= log2(2), linetype = 'dashed', color = 'grey70') +
+  xlim(-5, 5) +
+  xlab(TeX('$\\log_{2}$(FoldChange)')) +
+  ylab(TeX('$-\\log_{10}$(adjusted P-value)'))
+dev.off()
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+##~~~~~~~~~~~~~~~~~~~~~~DESeq2 for sao~~~~~~~~~~~~~~~~~~~~~~~
+saoanno <- read_csv('/extDisk2/cal_sao/figures_tables/saoanno.csv')
 
 targets <- data.frame(Group = factor(c('SAO', 'SAO', 'SAO', 'SAO_CAL', 'SAO_CAL', 'SAO_CAL')), Sample = paste0('sao', 1:6))
 rownames(targets) <- paste0(targets$Group, c(1:3, 1:3))
 colnames(saok$counts) <- rownames(targets)
-glioPR <- DESeqDataSetFromTximport(saok, colData = targets, design = ~Group)
+degres <- DESeqDataSetFromTximport(saok, colData = targets, design = ~Group)
 
-saoanno <- read.csv('/extDisk2/cal_sao/figures_tables/sao_rawgff_Anno.csv', row.names = 1, stringsAsFactors = FALSE)
 
-glioPR <- glioPR[rowSums(counts(glioPR)) > 1, ]
-glioPR <- DESeq(glioPR)
+## DEGs
+degres <- degres[rowSums(counts(degres)) > 1, ]
+degres <- DESeq(degres)
+
 ## count transformation
-rld <- rlog(glioPR)
-vst <- varianceStabilizingTransformation(glioPR)
-resRaw <- results(glioPR)
-summary(resRaw)
-res <- cbind(as.matrix(mcols(glioPR)[, 1:10]), assay(rld))
-anno <- saoanno[match(rownames(res), saoanno[, 2]), ]
-res <- cbind(anno, res[, 11:16], data.frame(resRaw[, c(5, 6, 2)]))
-res <- res[order(res[, 'padj']), ]
+rld <- rlog(degres)
+vst <- varianceStabilizingTransformation(degres)
+resRaw <- degres %>%
+  results %T>%
+  summary %>%
+  as.tibble
+
+res <- cbind.data.frame(as.matrix(mcols(degres)[, 1:10]), assay(rld), stringsAsFactors = FALSE) %>%
+  rownames_to_column(., var = 'ID') %>%
+  as.tibble %>%
+  bind_cols(.,  select(resRaw, pvalue, padj, log2FoldChange)) %>%
+  inner_join(., saoanno, by = 'ID') %>%
+  select(., ID, Gene : Length, SAO1 : log2FoldChange) %>%
+  arrange(., padj)
+
 write.csv(res, file = 'SAO_DEG_whole_k.csv', row.names = FALSE)
 
 ## padj < 0.05 & |log2FC| > 1
-sigLogic <- res$padj < 0.05 & abs(res$log2FoldChange) > log2(2)
-sigLogic[is.na(sigLogic)] <- FALSE
-resSig <- res[sigLogic, ]
+resSig <- res %>%
+  filter(padj < 0.05, abs(log2FoldChange) > log2(2), !is.na(padj))
+
 write.csv(resSig, file = 'SAO_DEG_FC2_k.csv', row.names = FALSE)
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~heat map~~~~~~~~~~~~~~~~~~~~~~~~~~
+library('pheatmap')
+
+## use rld
+heatmapCount <- resSig %>%
+  top_n(50) %>%
+  select(., Gene, SAO1 : SAO_CAL3) %>%
+  as.data.frame %>%
+  column_to_rownames(., var = 'Gene')
+
+annoCol <- data.frame(Group = colData(degres)[, 1])
+row.names(annoCol) <- rownames(colData(degres))
+annoColor <- list(Group = c(SAO = '#00C19F', SAO_CAL = '#F8766D'))
+## annoRow = data.frame(GeneClass = factor(rep(c("Path1", "Path2", "Path3"), c(30, 30, 40))))
+## rownames(annoRow) <- rownames(heatmapCount)
+cairo_pdf('SAO_heatmap.pdf')
+pheatmap(heatmapCount, annotation_col = annoCol, annotation_colors = annoColor, fontsize=12, fontsize_row=5.5, annotation_legend = TRUE)
+dev.off()
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PCA~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 library('directlabels')
@@ -237,4 +325,34 @@ ggplot(pcaData, aes(x = PC1, y = PC2, colour = Group)) +
 dev.off()
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+##~~~~~~~~~~~~~~~~~~~volcano plot~~~~~~~~~~~~~~~~~~~~~~~~~~
+library('ggplot2')
+library('latex2exp')
+
+## separate up and down
+sig <- res %>%
+  transmute(case_when(padj < 0.05 & log2FoldChange > log2(2) & !is.na(padj) ~ 'up',
+                      padj < 0.05 & log2FoldChange < -log2(2) & !is.na(padj) ~ 'down',
+                      TRUE ~ 'no')) %>%
+  unlist %>%
+  unname
+
+voldt <- data.frame(padj = -log10(res$padj),
+                    FC = res$log2FoldChange,
+                    Type = sig)
+## remove padj NA and no Inf
+voldt <- voldt[!(is.na(voldt$padj) | is.infinite(voldt$padj)), ]
+
+cairo_pdf('SAO_DEG_FC2_volplot.pdf')
+ggplot(voldt, aes(x = FC, y = padj, colour = Type)) +
+  geom_point(alpha = 0.75) +
+  scale_color_manual(values=c('forestgreen', 'grey60', 'firebrick'),
+                     labels = c('down-regulate DEGs', 'unchanged genes', 'up-regulated DEGs')) +
+  geom_vline(xintercept = -log2(2), linetype = 'dashed', color = 'grey70') +
+  geom_vline(xintercept= log2(2), linetype = 'dashed', color = 'grey70') +
+  xlim(-8, 8) +
+  xlab(TeX('$\\log_{2}$(FoldChange)')) +
+  ylab(TeX('$-\\log_{10}$(adjusted P-value)'))
+dev.off()
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ################################################################
