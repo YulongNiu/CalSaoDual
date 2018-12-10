@@ -168,10 +168,11 @@ res <- cbind.data.frame(as.matrix(mcols(degres)[, 1:10]), assay(rld), stringsAsF
 write.csv(res, file = 'CAL_DEG_whole_k.csv', row.names = FALSE)
 
 ## padj < 0.05 & |log2FC| > 1
+## padj < 0.05 & |log2FC| > log2(1.5)
 resSig <- res %>%
-  filter(padj < 0.05, abs(log2FoldChange) > log2(2), !is.na(padj))
+  filter(padj < 0.05, abs(log2FoldChange) > log2(1.5), !is.na(padj))
 
-write.csv(resSig, file = 'CAL_DEG_FC2_k.csv', row.names = FALSE)
+write.csv(resSig, file = 'CAL_DEG_FC1dot5_k.csv', row.names = FALSE)
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~heat map~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -189,7 +190,7 @@ row.names(annoCol) <- rownames(colData(degres))
 annoColor <- list(Group = c(CAL = '#00C19F', CAL_SAO = '#F8766D'))
 ## annoRow = data.frame(GeneClass = factor(rep(c("Path1", "Path2", "Path3"), c(30, 30, 40))))
 ## rownames(annoRow) <- rownames(heatmapCount)
-cairo_pdf('CAL_heatmap.pdf')
+cairo_pdf('CAL_heatmap_FC1dot5.pdf')
 pheatmap(heatmapCount, annotation_col = annoCol, annotation_colors = annoColor, fontsize=12, fontsize_row=5.5, annotation_legend = TRUE)
 dev.off()
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -233,7 +234,7 @@ voldt <- data.frame(padj = -log10(res$padj),
 ## remove padj NA and no Inf
 voldt <- voldt[!(is.na(voldt$padj) | is.infinite(voldt$padj)), ]
 
-cairo_pdf('CAL_DEG_FC2_volplot.pdf')
+cairo_pdf('CAL_DEG_FC1dot5_volplot.pdf')
 ggplot(voldt, aes(x = FC, y = padj, colour = Type)) +
   geom_point(alpha = 0.75) +
   scale_color_manual(values=c('forestgreen', 'grey60', 'firebrick'),
@@ -278,10 +279,11 @@ res <- cbind.data.frame(as.matrix(mcols(degres)[, 1:10]), assay(rld), stringsAsF
 write.csv(res, file = 'SAO_DEG_whole_k.csv', row.names = FALSE)
 
 ## padj < 0.05 & |log2FC| > 1
+## padj < 0.05 & |log2FC| > log2(1.5)
 resSig <- res %>%
-  filter(padj < 0.05, abs(log2FoldChange) > log2(2), !is.na(padj))
+  filter(padj < 0.05, abs(log2FoldChange) > log2(1.5), !is.na(padj))
 
-write.csv(resSig, file = 'SAO_DEG_FC2_k.csv', row.names = FALSE)
+write.csv(resSig, file = 'SAO_DEG_FC1dot5_k.csv', row.names = FALSE)
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~heat map~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -299,7 +301,7 @@ row.names(annoCol) <- rownames(colData(degres))
 annoColor <- list(Group = c(SAO = '#00C19F', SAO_CAL = '#F8766D'))
 ## annoRow = data.frame(GeneClass = factor(rep(c("Path1", "Path2", "Path3"), c(30, 30, 40))))
 ## rownames(annoRow) <- rownames(heatmapCount)
-cairo_pdf('SAO_heatmap.pdf')
+cairo_pdf('SAO_heatmap_FC1dot5.pdf')
 pheatmap(heatmapCount, annotation_col = annoCol, annotation_colors = annoColor, fontsize=12, fontsize_row=5.5, annotation_legend = TRUE)
 dev.off()
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -343,7 +345,7 @@ voldt <- data.frame(padj = -log10(res$padj),
 ## remove padj NA and no Inf
 voldt <- voldt[!(is.na(voldt$padj) | is.infinite(voldt$padj)), ]
 
-cairo_pdf('SAO_DEG_FC2_volplot.pdf')
+cairo_pdf('SAO_DEG_FC1dot5_volplot.pdf')
 ggplot(voldt, aes(x = FC, y = padj, colour = Type)) +
   geom_point(alpha = 0.75) +
   scale_color_manual(values=c('forestgreen', 'grey60', 'firebrick'),

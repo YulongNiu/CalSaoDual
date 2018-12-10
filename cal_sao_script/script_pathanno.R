@@ -19,6 +19,30 @@ saoKEGG <- lapply(saoPathRaw, function(x) {
 save(saoKEGG, file = 'saoKEGG.RData')
 ########################################################
 
+#########################BioCyc pathway sao##############
+library('KEGGAPI')
+library('BioCycAPI')
+library('foreach')
+library('doMC')
+library('stringr')
+library('utils')
+
+registerDoMC(8)
+
+##~~~~~~~~~~~~~~~~~~~~~~~~change BioCycIDs format to KEGG~~~~~~~~~~~
+cycIDsRaw <- getCycGenesList('GCF_000013425')
+cycIDs <- str_replace(cycIDsRaw, 'CAALFMP', 'CaalfMp')
+cycIDs <- str_replace(cycIDs, 'ORF', 'orf')
+cycIDs[cycIDs == 'G3B3-18'] <- 'CaalfMp08'
+cycIDs[cycIDs == 'G3B3-2'] <- 'orf19.1288'
+cycIDs[cycIDs == 'G3B3-75'] <- 'CaalfMp11'
+cycIDs[cycIDs == 'G3B3-3'] <- 'orf19.3733'
+cycIDs[cycIDs == 'G3B3-1'] <- 'orf19.5211'
+## noORFs <- cycIDs[!str_detect(cycIDs, 'orf')]
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#########################################################
+
 ##########################KEGG cal######################
 library('KEGGAPI')
 library('magrittr')
