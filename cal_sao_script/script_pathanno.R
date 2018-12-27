@@ -19,18 +19,87 @@ saoKEGG <- lapply(saoPathRaw, function(x) {
 save(saoKEGG, file = 'saoKEGG.RData')
 ########################################################
 
-#########################BioCyc pathway sao##############
-library('KEGGAPI')
-library('BioCycAPI')
-library('foreach')
-library('doMC')
-library('stringr')
-library('utils')
+#######################BioCyc genes####################
+## batch download BioCyc genes
+setwd('/extDisk2/cal_sao/kallisto_results/')
 
-registerDoMC(8)
+library('KEGGAPI') ## version 0.1.7.4
+library('BioCycAPI') ## version 0.2.1
+library('ParaMisc')
+library('doParallel')
+library('foreach')
+library('magrittr')
+
+saocycFolder <- 'saocycgenes'
+
+if (!dir.exists(saocycFolder)) {
+  dir.create(saocycFolder)
+} else {}
+
+cycIDsRaw <- getCycGenes('GCF_000013425')
+
+##~~~~~~~~~~~~parallel download~~~~~~~~~~~~~~~~~
+registerDoParallel(cores = 8)
+
+cutMat <- CutSeqEqu(length(cycIDsRaw), 8)
+
+for (j in 255:ncol(cutMat)) {
+
+  print(paste0('It is running ', j, ' in a total of ', ncol(cutMat), '.'))
+
+  cycAnno <- foreach(i = cutMat[1, j] : cutMat[2, j]) %dopar% {
+    eachCycIDs <- getCycGeneInfo(cycIDsRaw[i])
+    return(eachCycIDs)
+  }
+  names(cycAnno) <- cycIDsRaw[cutMat[1, j] : cutMat[2, j]]
+
+  paste0('sao', cutMat[1, j], '_', cutMat[2, j], '.RData') %>%
+    file.path(saocycFolder, .) %>%
+    save(cycAnno, file = ., compress = 'xz')
+}
+
+stopImplicitCluster()
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#######################################################
+
+#########################BioCyc pathway sao##############
+setwd('/extDisk2/cal_sao/kallisto_results/')
+
+library('KEGGAPI') ## version 0.1.7.4
+library('BioCycAPI') ## version 0.2.1
+library('readr')
+library('magrittr')
+library('foreach')
+library('tibble')
+library('dplyr')
+
+saores <- read_csv('SAO_DEG_whole_k.csv')
+
+## saocyc
+saocycFolder <- 'saocycgenes'
+saoFiles <- dir(saocycFolder, full.names = TRUE)
+
+foreach(i = seq_along(saoFiles), .combine = bind_rows) {
+  load(saoFiles[i])
+  eachConv <- tibble(keggID = names(cycAnno),
+         cycID = sapply(cycAnno, function(x){
+           eachname <- x$name %>%
+             .[grepl('SAOUHSC', x$name)]
+           return(eachname)
+         }))
+  return(eachConv)
+}
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~change BioCycIDs format to KEGG~~~~~~~~~~~
-cycIDsRaw <- getCycGenesList('GCF_000013425')
+KEGGIDsRaw <- getProID('sao')
+cycIDsRaw <- getCycGenes('GCF_000013425')
+cycIDsAnno <- cycIDsRaw[1:2] %>%
+  lapply(getCycGeneInfo) %>%
+  sapply('[[', 2)
+
+getCycPathway('GCF_000013425')
+
+
 cycIDs <- str_replace(cycIDsRaw, 'CAALFMP', 'CaalfMp')
 cycIDs <- str_replace(cycIDs, 'ORF', 'orf')
 cycIDs[cycIDs == 'G3B3-18'] <- 'CaalfMp08'

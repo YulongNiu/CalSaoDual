@@ -22,8 +22,9 @@ saoGO %<>% `[`(sapply(saoGO, length) > 0)
 saoKEGG %<>% `[`(sapply(saoKEGG, length) > 0)
 
 ## padj < 0.05 & |log2FC| > 1
+## padj < 0.05 & |log2FC| > log2(1.5)
 degVec <- res %>%
-  transmute(padj < 0.05 & abs(log2FoldChange) > log2(2) & !is.na(padj)) %>%
+  transmute(padj < 0.05 & abs(log2FoldChange) > log2(1.5) & !is.na(padj)) %>%
   unlist %>%
   as.integer
 names(degVec) <- res$ID
@@ -90,7 +91,7 @@ abLogFC %<>%
 
 KEGGTestWithCat %<>% inner_join(., abLogFC, by = 'category')
 
-write.csv(KEGGTestWithCat, file = 'SAO_FC2_KEGG_withcat.csv')
+write.csv(KEGGTestWithCat, file = 'SAO_FC1dot5_KEGG_withcat.csv')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ################################################################
 
@@ -120,9 +121,9 @@ res <- read_csv('CAL_DEG_whole_k.csv')
 saoGO %<>% `[`(sapply(saoGO, length) > 0)
 saoKEGG %<>% `[`(sapply(saoKEGG, length) > 0)
 
-## padj < 0.05 & |log2FC| > 1
+## padj < 0.05 & |log2FC| > log2(1.5)
 degVec <- res %>%
-  transmute(padj < 0.05 & abs(log2FoldChange) > log2(2) & !is.na(padj)) %>%
+  transmute(padj < 0.05 & abs(log2FoldChange) > log2(1.5) & !is.na(padj)) %>%
   unlist %>%
   as.integer
 names(degVec) <- res$ID
@@ -189,6 +190,6 @@ abLogFC %<>%
 
 KEGGTestWithCat %<>% inner_join(., abLogFC, by = 'category')
 
-write.csv(KEGGTestWithCat, file = 'CAL_FC2_KEGG_withcat.csv')
+write.csv(KEGGTestWithCat, file = 'CAL_FC1dot5_KEGG_withcat.csv')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ################################################################
