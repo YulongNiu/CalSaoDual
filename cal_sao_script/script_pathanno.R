@@ -137,6 +137,26 @@ saoConv <- foreach(i = seq_along(saoFiles), .combine = bind_rows) %do% {
 ## saores 2633 X 17
 
 ## BioCyc pathways
+saocycFolder <- 'saocycpaths'
+saoFiles <- dir(saocycFolder, full.names = TRUE)
+
+saoPath <- foreach(i = seq_along(saoFiles), .combine = append) %do% {
+  load(saoFiles[i])
+  eachPath <- lapply(cycAnno, '[[', 1)
+  return(eachPath)
+}
+
+## use kegg ID in BioCyc paths
+saoBioCyc <- lapply(saoPath, function(x) {
+  saoConv %>%
+    filter(cycID %in% x) %>%
+    .$keggID %>%
+    .[. %in% saores$ID]
+})
+## remove no genes
+saoBioCyc %<>% .[sapply(., length) > 0]
+
+save(saoBioCyc, file = 'saoBioCyc.RData')
 #########################################################
 
 ##########################KEGG cal######################
@@ -182,4 +202,103 @@ calKEGG <- lapply(calPathRaw, function(x) {
 
 save(calKEGG, file = 'calKEGG.RData')
 ########################################################
+
+#######################BioCyc pathways cal####################
+setwd('/extDisk2/cal_cal/kallisto_results/')
+
+library('BioCycAPI') ## version 0.2.1
+library('ParaMisc')
+library('doParallel')
+library('foreach')
+library('magrittr')
+
+calcycFolder <- 'caocycpaths'
+
+if (!dir.exists(calcycFolder)) {
+  dir.create(calcycFolder)
+} else {}
+
+calPath <- getCycPathway('CALBI')
+
+##~~~~~~~~~~~~parallel download~~~~~~~~~~~~~~~~~
+registerDoParallel(cores = 8)
+
+cutMat <- CutSeqEqu(nrow(calPath), 8)
+
+for (j in 73:ncol(cutMat)) {
+
+  print(paste0('It is running ', j, ' in a total of ', ncol(cutMat), '.'))
+
+  cycAnno <- foreach(i = cutMat[1, j] : cutMat[2, j]) %dopar% {
+    eachCycIDs <- calPath[i, 1] %>%
+      as.character %>%
+      getCycGenesfPathway
+    return(eachCycIDs)
+  }
+  names(cycAnno) <- calPath$pathID[cutMat[1, j] : cutMat[2, j]]
+
+  paste0('cal', cutMat[1, j], '_', cutMat[2, j], '.RData') %>%
+    file.path(calcycFolder, .) %>%
+    save(cycAnno, file = ., compress = 'xz')
+}
+
+stopImplicitCluster()
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+###########################################################
+
+
+#########################BioCyc pathway cal##############
+setwd('/extDisk2/cal_sao/kallisto_results/')
+
+library('KEGGAPI') ## version 0.1.7.4
+library('BioCycAPI') ## version 0.2.1
+library('readr')
+library('magrittr')
+library('foreach')
+library('tibble')
+library('dplyr')
+
+calres <- read_csv('CAL_DEG_whole_k.csv')
+
+## calcyc genes
+cycIDRaws <- tibble(CycID = getCycGenes('CALBI'))
+cycID <- cycIDRaws %>%
+  mutate(ORF = cycIDRaws$CycID %>%
+           strsplit(split = ':', fixed = TRUE) %>%
+           sapply('[[', 2) %>%
+           tolower)
+calID <- tibble(ID = calres$ID,
+                ORF = calres$Product %>%
+                  strsplit(split = ')', fixed = TRUE) %>%
+                  sapply('[[', 1) %>%
+                  substring(first = 2))
+
+calConv <- inner_join(cycID, calID, by = 'ORF')
+
+## BioCyc Cal 6093 X 2
+## calres 6207 X 17
+## calConv 6039 X 3
+
+## BioCyc pathways
+calcycFolder <- 'calcycpaths'
+calFiles <- dir(calcycFolder, full.names = TRUE)
+
+calPath <- foreach(i = seq_along(calFiles), .combine = append) %do% {
+  load(calFiles[i])
+  eachPath <- lapply(cycAnno, '[[', 1)
+  return(eachPath)
+}
+
+## use kegg ID in BioCyc paths
+calBioCyc <- lapply(calPath, function(x) {
+  calConv %>%
+    filter(CycID %in% x) %>%
+    .$ID %>%
+    .[. %in% calres$ID]
+})
+## remove no genes
+calBioCyc %<>% .[sapply(., length) > 0]
+
+save(calBioCyc, file = 'calBioCyc.RData')
+#########################################################
 
