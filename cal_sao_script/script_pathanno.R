@@ -302,3 +302,60 @@ calBioCyc %<>% .[sapply(., length) > 0]
 save(calBioCyc, file = 'calBioCyc.RData')
 #########################################################
 
+
+######################preprocess GO########################
+setwd('/extDisk2/cal_sao/kallisto_results/')
+
+library('stringr')
+library('readr')
+library('dplyr')
+
+calres <- read_csv('CAL_DEG_whole_k.csv')
+calres %<>%
+  select(ID) %>%
+  rename(resID = ID) %>%
+  mutate(ID = resID %>%
+           substr(., start = 1, stop = nchar(.) - 2))
+
+rawGO <- read_delim('gene_association.cgd',
+                    delim = '\t',
+                    col_names = c('DB', 'DB_Object_ID', 'DB_Object_Symbol', 'NOT', 'GOID', 'Reference', 'Evidence', 'WithFrom', 'Aspect', 'DB_Object_Name', 'DB_Object_Synonym', 'DB_Object_Type', 'taxon', 'Date', 'Assigned_by', 'X16', 'X17')) %>%
+  select(-NOT, -X16, -X17)
+
+## taxon:5476
+rawCalGO <- rawGO %>%
+  filter(taxon == 'taxon:5476') %>%
+  select(Synonym = DB_Object_Synonym, GOID, Aspect) %>%
+  mutate(ID = Synonym %>%
+           strsplit(split = '|', fixed = TRUE) %>%
+           sapply('[[', 1) %>%
+           substr(., start = 1, stop = nchar(.) - 2))
+
+calGO <- inner_join(rawCalGO, calres, by = 'ID')
+## rawCalGO 43389 X 4
+## calGO 42518 X 5
+
+## MF
+MFList <- calGO %>%
+  filter(Aspect == 'F') %>%
+  select(GOID, resID) %>%
+  distinct %>%
+  {split(.$resID, .$GOID)}
+
+## BP
+BPList <- calGO %>%
+  filter(Aspect == 'P') %>%
+  select(GOID, resID) %>%
+  distinct %>%
+  {split(.$resID, .$GOID)}
+
+## CC
+CCList <- calGO %>%
+  filter(Aspect == 'C') %>%
+  select(GOID, resID) %>%
+  distinct %>%
+  {split(.$resID, .$GOID)}
+
+save(BPList, MFList, CCList, file = 'calGO.RData')
+###########################################################
+
