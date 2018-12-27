@@ -19,11 +19,10 @@ saoKEGG <- lapply(saoPathRaw, function(x) {
 save(saoKEGG, file = 'saoKEGG.RData')
 ########################################################
 
-#######################BioCyc genes####################
+#######################BioCyc genes sao####################
 ## batch download BioCyc genes
 setwd('/extDisk2/cal_sao/kallisto_results/')
 
-library('KEGGAPI') ## version 0.1.7.4
 library('BioCycAPI') ## version 0.2.1
 library('ParaMisc')
 library('doParallel')
@@ -43,7 +42,7 @@ registerDoParallel(cores = 8)
 
 cutMat <- CutSeqEqu(length(cycIDsRaw), 8)
 
-for (j in 255:ncol(cutMat)) {
+for (j in i:ncol(cutMat)) {
 
   print(paste0('It is running ', j, ' in a total of ', ncol(cutMat), '.'))
 
@@ -62,6 +61,51 @@ stopImplicitCluster()
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #######################################################
 
+
+#######################BioCyc pathways sao####################
+setwd('/extDisk2/cal_sao/kallisto_results/')
+
+library('BioCycAPI') ## version 0.2.1
+library('ParaMisc')
+library('doParallel')
+library('foreach')
+library('magrittr')
+
+saocycFolder <- 'saocycpaths'
+
+if (!dir.exists(saocycFolder)) {
+  dir.create(saocycFolder)
+} else {}
+
+saoPath <- getCycPathway('GCF_000013425')
+
+##~~~~~~~~~~~~parallel download~~~~~~~~~~~~~~~~~
+registerDoParallel(cores = 8)
+
+cutMat <- CutSeqEqu(nrow(saoPath), 8)
+
+for (j in 1:ncol(cutMat)) {
+
+  print(paste0('It is running ', j, ' in a total of ', ncol(cutMat), '.'))
+
+  cycAnno <- foreach(i = cutMat[1, j] : cutMat[2, j]) %dopar% {
+    eachCycIDs <- saoPath[i, 1] %>%
+      as.character %>%
+      getCycGenesfPathway
+    return(eachCycIDs)
+  }
+  names(cycAnno) <- saoPath$pathID[cutMat[1, j] : cutMat[2, j]]
+
+  paste0('sao', cutMat[1, j], '_', cutMat[2, j], '.RData') %>%
+    file.path(saocycFolder, .) %>%
+    save(cycAnno, file = ., compress = 'xz')
+}
+
+stopImplicitCluster()
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+###########################################################
+
+
 #########################BioCyc pathway sao##############
 setwd('/extDisk2/cal_sao/kallisto_results/')
 
@@ -75,41 +119,24 @@ library('dplyr')
 
 saores <- read_csv('SAO_DEG_whole_k.csv')
 
-## saocyc
+## saocyc genes
 saocycFolder <- 'saocycgenes'
 saoFiles <- dir(saocycFolder, full.names = TRUE)
 
-foreach(i = seq_along(saoFiles), .combine = bind_rows) {
+saoConv <- foreach(i = seq_along(saoFiles), .combine = bind_rows) %do% {
   load(saoFiles[i])
-  eachConv <- tibble(keggID = names(cycAnno),
-         cycID = sapply(cycAnno, function(x){
+  eachConv <- tibble(cycID = names(cycAnno),
+         keggID = sapply(cycAnno, function(x){
            eachname <- x$name %>%
              .[grepl('SAOUHSC', x$name)]
            return(eachname)
          }))
   return(eachConv)
 }
+## BioCyc Sao 2923 X 2
+## saores 2633 X 17
 
-##~~~~~~~~~~~~~~~~~~~~~~~~change BioCycIDs format to KEGG~~~~~~~~~~~
-KEGGIDsRaw <- getProID('sao')
-cycIDsRaw <- getCycGenes('GCF_000013425')
-cycIDsAnno <- cycIDsRaw[1:2] %>%
-  lapply(getCycGeneInfo) %>%
-  sapply('[[', 2)
-
-getCycPathway('GCF_000013425')
-
-
-cycIDs <- str_replace(cycIDsRaw, 'CAALFMP', 'CaalfMp')
-cycIDs <- str_replace(cycIDs, 'ORF', 'orf')
-cycIDs[cycIDs == 'G3B3-18'] <- 'CaalfMp08'
-cycIDs[cycIDs == 'G3B3-2'] <- 'orf19.1288'
-cycIDs[cycIDs == 'G3B3-75'] <- 'CaalfMp11'
-cycIDs[cycIDs == 'G3B3-3'] <- 'orf19.3733'
-cycIDs[cycIDs == 'G3B3-1'] <- 'orf19.5211'
-## noORFs <- cycIDs[!str_detect(cycIDs, 'orf')]
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+## BioCyc pathways
 #########################################################
 
 ##########################KEGG cal######################
