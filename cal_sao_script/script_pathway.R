@@ -22,6 +22,7 @@ res <- read_csv('SAO_DEG_whole_k.csv')
 ## remove 0 terms
 saoGO %<>% `[`(sapply(saoGO, length) > 0)
 saoKEGG %<>% `[`(sapply(saoKEGG, length) > 0)
+saoBioCyc %<>% `[`(sapply(saoBioCyc, length) > 0)
 
 ## padj < 0.05 & |log2FC| > 1
 ## padj < 0.05 & |log2FC| > log2(1.5)
@@ -184,29 +185,42 @@ degVec <- res %>%
 names(degVec) <- res$ID
 
 pwf <- nullp(degVec, bias.data = res$Length)
-x
+
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~GO~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GOMat <- foreach(i = 1:length(saoGO), .combine = rbind) %dopar% {
-  eachMat <- cbind(saoGO[[i]], names(saoGO)[i])
+GOMat <- foreach(i = 1:length(calGO), .combine = rbind) %dopar% {
+  eachMat <- cbind(calGO[[i]], names(calGO)[i])
   return(eachMat)
-}
-GOMat <- as.data.frame(GOMat)
-GOTestWithCat <- goseq(pwf, gene2cat = GOMat, use_genes_without_cat = FALSE)
-GOTestWithCat <- GOTestWithCat[!is.na(GOTestWithCat$ontology), ]
+} %>% as.data.frame
+
+GOTestWithCat <- goseq(pwf, gene2cat = GOMat, use_genes_without_cat = FALSE) %>%
+  as.tibble %>%
+  filter(!is.na(ontology))
 
 ## add ablog2FC
-goSub <- saoGO[match(GOTestWithCat[, 1], names(saoGO))]
-abLogFC <- sapply(goSub, function(x) {
-  eachFC <- res[match(x, res$GeneID), 'log2FoldChange']
-  return(mean(abs(eachFC), na.rm = TRUE))
+abLogFC <- sapply(GOTestWithCat$category, function(x) {
+  eachres <- res %>%
+    filter(., ID %in% calGO[[x]]) %>%
+    transmute(., log2FoldChange) %>%
+    unlist %>%
+    abs %>%
+    mean(., na.rm = TRUE)
+
+  return(eachres)
 })
-GOTestWithCat$abLogFC <- abLogFC
+
+abLogFC %<>%
+  as.data.frame %>%
+  rownames_to_column(., var = 'category') %>%
+  rename(., abLogFC = `.`) %>%
+  as_tibble
+
+GOTestWithCat %<>% inner_join(., abLogFC, by = 'category')
 
 ## deal with NA and select BP MF and CC
 termCat <- c('BP', 'MF', 'CC')
 for (i in termCat) {
-  write.csv(GOTestWithCat[GOTestWithCat$ontology == i, ],
-            paste0('degseq4h_FC2_', i, '_withcat.csv'))
+  write.csv(GOTestWithCat %>% filter(ontology == i),
+            paste0('CAL_FC2_', i, '_withcat.csv'))
 }
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -285,3 +299,7 @@ BioCycTestWithCat %<>% inner_join(., abLogFC, by = 'category')
 write.csv(BioCycTestWithCat, file = 'CAL_FC2_BioCyc_withcat.csv')
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ################################################################
+
+##################plot pathway###########################
+
+#########################################################

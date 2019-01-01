@@ -166,7 +166,6 @@ library('stringr')
 library('topGO')
 library('dplyr')
 
-
 setwd('/extDisk2/cal_sao/kallisto_results')
 
 saores <- read_csv('SAO_DEG_whole_k.csv')
@@ -410,6 +409,9 @@ CCList <- calGO %>%
   distinct %>%
   {split(.$resID, .$GOID)}
 
-save(BPList, MFList, CCList, file = 'calGO.RData')
+calGO <- append(BPList, MFList) %>%
+  append(CCList)
+
+save(calGO, file = 'calGO.RData')
 ###########################################################
 
