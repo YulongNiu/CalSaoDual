@@ -301,5 +301,44 @@ write.csv(BioCycTestWithCat, file = 'CAL_FC2_BioCyc_withcat.csv')
 ################################################################
 
 ##################plot pathway###########################
+setwd('/extDisk2/cal_sao/kallisto_results/')
 
+library('ggplot2')
+library('RColorBrewer')
+library('latex2exp')
+library('magrittr')
+library('stringr')
+
+fname <- dir(pattern = 'CAL_FC2_.*_withcat.csv')
+fbasename <- fname %>%
+  strsplit(., split = '.', fixed = TRUE) %>%
+  sapply(., `[`, 1)
+
+
+for (i in seq_along(fname)) {
+##for (i in 1:2) {
+  pMat <- read.csv(fname[i], row.names = 1, stringsAsFactor = FALSE)
+
+  ## pvalue < 0.05
+  plotpMat <- pMat[, c('term', 'numDEInCat', 'over_represented_pvalue', 'abLogFC')]
+  ## plotpMat$Annotation %<>% str_replace('<i>', '') %>% str_replace('</i>', '') %<>% str_replace('<sub>', '') %>% str_replace('</sub>', '')
+
+  plotpMat[, 3] <- -log10(plotpMat[, 3])
+  colnames(plotpMat) <- c('Name', 'Size', 'logpvalue', 'ablogFC')
+
+  colorPal <- colorRampPalette(rev(c('red', 'yellow', 'cyan', 'blue')), bias=1)(10)
+
+  ggplot(plotpMat[plotpMat[, 'logpvalue'] >= -log10(0.05), ], aes(x = ablogFC, y = Name)) +
+  ## ggplot(plotpMat[1:10, ], aes(x = ablogFC, y = Name)) +
+    geom_point(aes(size = Size, colour = logpvalue)) +
+    scale_size_continuous(name = 'Number of significant genes', range = c(3,8)) +
+    scale_colour_gradientn(name = '-log10(P-value)', limits=c(0, max(plotpMat[, 3])), colours = colorPal) +
+    ylab('') +
+    xlab(TeX('Average |$\\log_{2}$FC|')) +
+    theme(legend.position = 'bottom',
+          axis.text.x = element_text(size = 12),
+          axis.text.y = element_text(size = 11),
+          axis.title.x = element_text(size = 13, face = 'bold'))
+  ggsave(paste0(fbasename[i], '.pdf'), width = 13)
+}
 #########################################################
