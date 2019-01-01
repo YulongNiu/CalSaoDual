@@ -159,6 +159,49 @@ saoBioCyc %<>% .[sapply(., length) > 0]
 save(saoBioCyc, file = 'saoBioCyc.RData')
 #########################################################
 
+##########################sao GO from uniprot############
+library('dplyr')
+library('readr')
+library('stringr')
+
+setwd('/extDisk2/cal_sao/kallisto_results')
+
+saores <- read_csv('SAO_DEG_whole_k.csv')
+
+rawGO <- read_delim('uniprot-taxonomy_sao_GO.tab', delim = '\t') %>%
+  filter(Organism %in% 'Staphylococcus aureus (strain NCTC 8325)') %>% ## filter species
+  rename(GOID = `Gene ontology IDs`, Locus = `ordered locus`, GeneName = `Gene names`) %>%
+  filter(!is.na(GOID))
+
+## manual check
+write.csv(rawGO, 'rawGO.csv', row.names = FALSE)
+
+## manual GO
+manualGO <- read_csv('rawGO.csv') %>%
+  select(Locus, GOID)
+
+## check duplicated GO
+duplicated(manualGO$Locus) %>% sum
+
+## merge saores
+saoGOTable <- inner_join(saores, manualGO, c('ID' = 'Locus')) %>%
+  select(ID, GOID)
+## saores 2633 X 17
+## saoGOTable 2013 X 18
+
+## genes2GO
+saoGene2GO <- lapply(saoGOTable$GOID, function(x){
+  eachGO <- x %>%
+    strsplit(split = ';', fixed = TRUE) %>%
+    unlist %>%
+    str_trim
+  return(eachGO)
+})
+names(saoGene2GO) <- saoGOTable$ID
+
+
+#########################################################
+
 ##########################KEGG cal######################
 library('KEGGAPI')
 library('magrittr')
@@ -303,7 +346,7 @@ save(calBioCyc, file = 'calBioCyc.RData')
 #########################################################
 
 
-######################preprocess GO########################
+######################preprocess cal GO########################
 setwd('/extDisk2/cal_sao/kallisto_results/')
 
 library('stringr')
