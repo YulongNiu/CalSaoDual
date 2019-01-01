@@ -37,9 +37,10 @@ pwf <- nullp(degVec, bias.data = res$Length)
 GOMat <- foreach(i = 1:length(saoGO), .combine = rbind) %dopar% {
   eachMat <- cbind(saoGO[[i]], names(saoGO)[i])
   return(eachMat)
-}
-GOMat <- as.data.frame(GOMat)
-GOTestWithCat <- goseq(pwf, gene2cat = GOMat, use_genes_without_cat = FALSE)
+} %>% as.data.frame(GOMat)
+
+GOTestWithCat <- goseq(pwf, gene2cat = GOMat, use_genes_without_cat = FALSE) %>%
+  as.tibble
 GOTestWithCat <- GOTestWithCat[!is.na(GOTestWithCat$ontology), ]
 
 ## add ablog2FC

@@ -117,6 +117,7 @@ library('foreach')
 library('tibble')
 library('dplyr')
 
+
 saores <- read_csv('SAO_DEG_whole_k.csv')
 
 ## saocyc genes
@@ -160,9 +161,11 @@ save(saoBioCyc, file = 'saoBioCyc.RData')
 #########################################################
 
 ##########################sao GO from uniprot############
-library('dplyr')
 library('readr')
 library('stringr')
+library('topGO')
+library('dplyr')
+
 
 setwd('/extDisk2/cal_sao/kallisto_results')
 
@@ -199,7 +202,14 @@ saoGene2GO <- lapply(saoGOTable$GOID, function(x){
 })
 names(saoGene2GO) <- saoGOTable$ID
 
+BPList <- annFUN.gene2GO(whichOnto = 'BP', gene2GO = saoGene2GO)
+MFList <- annFUN.gene2GO(whichOnto = 'MF', gene2GO = saoGene2GO)
+CCList <- annFUN.gene2GO(whichOnto = 'CC', gene2GO = saoGene2GO)
 
+saoGO <- append(BPList, MFList) %>%
+  append(CCList)
+
+save(saoGO, file = 'saoGO.RData')
 #########################################################
 
 ##########################KEGG cal######################
@@ -207,6 +217,7 @@ library('KEGGAPI')
 library('magrittr')
 library('dplyr')
 library('readr')
+
 
 setwd('/extDisk2/cal_sao/kallisto_results/')
 degres <- read_csv('CAL_DEG_whole_k.csv')
