@@ -37,25 +37,37 @@ pwf <- nullp(degVec, bias.data = res$Length)
 GOMat <- foreach(i = 1:length(saoGO), .combine = rbind) %dopar% {
   eachMat <- cbind(saoGO[[i]], names(saoGO)[i])
   return(eachMat)
-} %>% as.data.frame(GOMat)
+} %>% as.data.frame
 
 GOTestWithCat <- goseq(pwf, gene2cat = GOMat, use_genes_without_cat = FALSE) %>%
-  as.tibble
-GOTestWithCat <- GOTestWithCat[!is.na(GOTestWithCat$ontology), ]
+  as.tibble %>%
+  filter(!is.na(ontology))
 
 ## add ablog2FC
-goSub <- saoGO[match(GOTestWithCat[, 1], names(saoGO))]
-abLogFC <- sapply(goSub, function(x) {
-  eachFC <- res[match(x, res$GeneID), 'log2FoldChange']
-  return(mean(abs(eachFC), na.rm = TRUE))
+abLogFC <- sapply(GOTestWithCat$category, function(x) {
+  eachres <- res %>%
+    filter(., ID %in% saoGO[[x]]) %>%
+    transmute(., log2FoldChange) %>%
+    unlist %>%
+    abs %>%
+    mean(., na.rm = TRUE)
+
+  return(eachres)
 })
-GOTestWithCat$abLogFC <- abLogFC
+
+abLogFC %<>%
+  as.data.frame %>%
+  rownames_to_column(., var = 'category') %>%
+  rename(., abLogFC = `.`) %>%
+  as_tibble
+
+GOTestWithCat %<>% inner_join(., abLogFC, by = 'category')
 
 ## deal with NA and select BP MF and CC
 termCat <- c('BP', 'MF', 'CC')
 for (i in termCat) {
-  write.csv(GOTestWithCat[GOTestWithCat$ontology == i, ],
-            paste0('degseq4h_FC2_', i, '_withcat.csv'))
+  write.csv(GOTestWithCat %>% filter(ontology == i),
+            paste0('SAO_FC2_', i, '_withcat.csv'))
 }
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
